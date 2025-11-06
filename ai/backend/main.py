@@ -52,7 +52,21 @@ async def chat(request: ChatRequest):
                     "stream": False
                 }
             )
-            response.raise_for_status()
+            
+            # Check status and get error details if failed
+            if response.status_code != 200:
+                error_detail = "Unknown error"
+                try:
+                    error_data = response.json()
+                    error_detail = error_data.get("error", str(response.text))
+                except:
+                    error_detail = response.text[:500]  # Limit error message length
+                
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Ollama error (status {response.status_code}): {error_detail}"
+                )
+            
             result = response.json()
             
             # Extract the response text
@@ -60,12 +74,14 @@ async def chat(request: ChatRequest):
             
             return ChatResponse(response=ai_response)
     
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Request timeout - AI model took too long to respond")
     except httpx.RequestError as e:
         raise HTTPException(
             status_code=503, 
-            detail=f"Cannot connect to Ollama at {OLLAMA_URL}. Make sure Ollama is running."
+            detail=f"Cannot connect to Ollama at {OLLAMA_URL}. Make sure Ollama is running. Error: {str(e)}"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
