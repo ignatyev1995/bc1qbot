@@ -209,7 +209,8 @@ class _HomePageState extends State<HomePage> {
               children: [
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(30),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
                   decoration: const BoxDecoration(
                     color: Colors.black,
                   ),
@@ -222,29 +223,68 @@ class _HomePageState extends State<HomePage> {
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
-                  decoration: const BoxDecoration(
-                    color: Colors.black,
-                  ),
-                  child: const Column(children: [
+                  child: Column(children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Text('Sell',
+                        const Text('Sell',
                             style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
+                              fontWeight: FontWeight.w300,
+                              color: Color(0xFF818181),
+                              fontSize: 20,
                             )),
-                        Row(
-                          children: [],
+                        SizedBox(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                Image.asset('assets/sample/1.png',
+                                    width: 15, height: 15, fit: BoxFit.contain),
+                                const SizedBox(width: 5),
+                                Image.asset('assets/sample/2.png',
+                                    width: 15, height: 15, fit: BoxFit.contain),
+                                const SizedBox(width: 5),
+                                Image.asset('assets/sample/3.png',
+                                    width: 15, height: 15, fit: BoxFit.contain),
+                                const SizedBox(width: 5),
+                                Image.asset('assets/sample/4.png',
+                                    width: 15, height: 15, fit: BoxFit.contain),
+                                const SizedBox(width: 5),
+                                Image.asset('assets/sample/5.png',
+                                    width: 15, height: 15, fit: BoxFit.contain),
+                              ],
+                            ),
+                          ),
                         )
                       ],
                     ),
-                    SizedBox(height: 15),
-                    Row(),
-                    SizedBox(height: 15),
-                    Row()
+                    const SizedBox(height: 15),
+                    const Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: []),
+                    const SizedBox(height: 15),
+                    const Row()
                   ]),
                 ),
-                // Add your second child here
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text('1',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 30,
+                          )),
+                      Row()
+                    ],
+                  ),
+                ),
                 if (!_isFocused)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20.0),
