@@ -26,6 +26,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/icons/menu/
     - assets/sample/
     - .env
   
@@ -43,5 +44,9 @@ flutter:
           weight: 700
         - asset: assets/fonts/AEROPORT-BLACK.OTF
           weight: 900
+    - family: Aeroport Mono
+      fonts:
+        - asset: assets/fonts/AEROPORT-MONOSPACED-TRIAL.OTF
+          weight: 400
 
 

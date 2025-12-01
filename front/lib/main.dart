@@ -318,7 +318,859 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       debugShowCheckedModeBanner: false,
-      home: const HomePage(),
+      home: const SimpleMainPage(),
+    );
+  }
+}
+
+class SimpleMainPage extends StatefulWidget {
+  const SimpleMainPage({super.key});
+
+  @override
+  State<SimpleMainPage> createState() => _SimpleMainPageState();
+}
+
+class _SimpleMainPageState extends State<SimpleMainPage>
+    with TickerProviderStateMixin {
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  final GlobalKey _textFieldKey = GlobalKey();
+  bool _isFocused = false;
+  String _selectedTab = 'Coins'; // Default selected tab
+
+  // Mock coin data
+  final List<Map<String, dynamic>> _coins = [
+    {
+      'icon': 'assets/sample/usdt.png',
+      'ticker': 'USDT',
+      'blockchain': 'On TON',
+      'amount': '20',
+      'usdValue': '\$71',
+    },
+    {
+      'icon': 'assets/sample/1.png',
+      'ticker': 'NOT',
+      'blockchain': 'On TON',
+      'amount': '20,000,000,000',
+      'usdValue': '\$71',
+    },
+    {
+      'icon': 'assets/sample/4.png',
+      'ticker': 'STON',
+      'blockchain': 'On TON',
+      'amount': '40,000,000',
+      'usdValue': '\$100',
+    },
+  ];
+
+  late final AnimationController _bgController;
+  late final Animation<double> _bgAnimation;
+  late final double _bgSeed;
+  late final AnimationController _noiseController;
+  late final Animation<double> _noiseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      setState(() {
+        _isFocused = _focusNode.hasFocus;
+      });
+    });
+    _controller.addListener(() {
+      if (_controller.text.contains('\n')) {
+        final textWithoutNewline = _controller.text.replaceAll('\n', '');
+        _controller.value = TextEditingValue(
+          text: textWithoutNewline,
+          selection: TextSelection.collapsed(offset: textWithoutNewline.length),
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _navigateToNewPage();
+        });
+      }
+      setState(() {});
+    });
+
+    final random = math.Random();
+    final durationMs = 20000 + random.nextInt(14000);
+    _bgController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: durationMs),
+    )..repeat(reverse: true);
+    _bgAnimation =
+        CurvedAnimation(parent: _bgController, curve: Curves.easeInOut);
+    _bgSeed = random.nextDouble();
+    _noiseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 24),
+    )..repeat(reverse: true);
+    _noiseAnimation =
+        Tween<double>(begin: -0.2, end: 0.2).animate(CurvedAnimation(
+      parent: _noiseController,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    _bgController.dispose();
+    _noiseController.dispose();
+    super.dispose();
+  }
+
+  void _navigateToNewPage() {
+    final text = _controller.text.trim();
+    if (text.isNotEmpty) {
+      VercelAnalytics.trackEvent('question_submitted', properties: {
+        'question_length': text.length.toString(),
+      });
+
+      VercelAnalytics.trackPageView(path: '/response', title: 'Response');
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NewPage(title: text),
+        ),
+      ).then((_) {
+        _controller.clear();
+        VercelAnalytics.trackPageView(path: '/', title: 'Home');
+      });
+    }
+  }
+
+  Color _shiftColor(Color base, double shift) {
+    final hsl = HSLColor.fromColor(base);
+    final newLightness = (hsl.lightness + shift).clamp(0.0, 1.0);
+    final newHue = (hsl.hue + shift * 10) % 360;
+    final newSaturation = (hsl.saturation + shift * 0.1).clamp(0.0, 1.0);
+    return hsl
+        .withLightness(newLightness)
+        .withHue(newHue)
+        .withSaturation(newSaturation)
+        .toColor();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: AnimatedBuilder(
+        animation: _bgAnimation,
+        builder: (context, child) {
+          final baseShimmer =
+              math.sin(2 * math.pi * (_bgAnimation.value + _bgSeed));
+          final shimmer = 0.007 * baseShimmer;
+          final baseColors = AppTheme.baseColors;
+          const stopsCount = 28;
+          final colors = List.generate(stopsCount, (index) {
+            final progress = index / (stopsCount - 1);
+            final scaled = progress * (baseColors.length - 1);
+            final lowerIndex = scaled.floor();
+            final upperIndex = scaled.ceil();
+            final frac = scaled - lowerIndex;
+            final lower =
+                baseColors[lowerIndex.clamp(0, baseColors.length - 1)];
+            final upper =
+                baseColors[upperIndex.clamp(0, baseColors.length - 1)];
+            final blended = Color.lerp(lower, upper, frac)!;
+            final offset = index * 0.0015;
+            return _shiftColor(blended, shimmer * (0.035 + offset));
+          });
+          final stops = List.generate(
+              colors.length, (index) => index / (colors.length - 1));
+          final rotation =
+              math.sin(2 * math.pi * (_bgAnimation.value + _bgSeed)) * 0.35;
+          final begin = Alignment(-0.8 + rotation, -0.7 - rotation * 0.2);
+          final end = Alignment(0.9 - rotation, 0.8 + rotation * 0.2);
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: begin,
+                    end: end,
+                    colors: colors,
+                    stops: stops,
+                  ),
+                ),
+              ),
+              AnimatedBuilder(
+                animation: _noiseAnimation,
+                builder: (context, _) {
+                  final alignment = Alignment(
+                    0.2 + _noiseAnimation.value,
+                    -0.4 + _noiseAnimation.value * 0.5,
+                  );
+                  return Container(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: alignment,
+                        radius: 0.75,
+                        colors: [
+                          Colors.white.withOpacity(0.01),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 1.0],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0.7, -0.6),
+                    radius: 0.8,
+                    colors: [
+                      _shiftColor(AppTheme.radialGradientColor, shimmer * 0.4),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 1.0],
+                  ),
+                  color: AppTheme.overlayColor.withOpacity(0.02),
+                ),
+              ),
+              IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withOpacity(0.01),
+                        Colors.transparent,
+                        Colors.white.withOpacity(0.005),
+                      ],
+                      stops: const [0.0, 0.5, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+              child!,
+            ],
+          );
+        },
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.only(
+                      top: 30, bottom: 15, left: 15, right: 15),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SvgPicture.asset(
+                        AppTheme.isLightTheme
+                            ? 'assets/images/logo_light.svg'
+                            : 'assets/images/logo_dark.svg',
+                        width: 30,
+                        height: 30,
+                      ),
+                      const SizedBox(height: 15),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            '..xk5str4e',
+                            style: TextStyle(
+                              fontFamily: 'Aeroport Mono',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w400,
+                              color: AppTheme.textColor,
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  // Copy action
+                                },
+                                child: SvgPicture.asset(
+                                  'assets/icons/copy.svg',
+                                  width: 15,
+                                  height: 15,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              GestureDetector(
+                                onTap: () {
+                                  // Edit action
+                                },
+                                child: SvgPicture.asset(
+                                  'assets/icons/edit.svg',
+                                  width: 15,
+                                  height: 15,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              GestureDetector(
+                                onTap: () {
+                                  // Exit action
+                                },
+                                child: SvgPicture.asset(
+                                  'assets/icons/exit.svg',
+                                  width: 15,
+                                  height: 15,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            r'$345,768.64',
+                            style: TextStyle(
+                              fontFamily: 'Aeroport',
+                              fontSize: 30,
+                              fontWeight: FontWeight.w400,
+                              color: AppTheme.textColor,
+                              height: 1.0,
+                            ),
+                            textHeightBehavior: const TextHeightBehavior(
+                              applyHeightToFirstAscent: false,
+                              applyHeightToLastDescent: false,
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Wallet 1',
+                                style: TextStyle(
+                                  fontFamily: 'Aeroport',
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w400,
+                                  color: AppTheme.textColor,
+                                  height: 1.0,
+                                ),
+                                textHeightBehavior: const TextHeightBehavior(
+                                  applyHeightToFirstAscent: false,
+                                  applyHeightToLastDescent: false,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              SvgPicture.asset(
+                                AppTheme.isLightTheme
+                                    ? 'assets/icons/select_light.svg'
+                                    : 'assets/icons/select_dark.svg',
+                                width: 5,
+                                height: 10,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 30),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                SvgPicture.asset(
+                                  AppTheme.isLightTheme
+                                      ? 'assets/icons/menu/get_light.svg'
+                                      : 'assets/icons/menu/get_dark.svg',
+                                  width: 30,
+                                  height: 30,
+                                ),
+                                const SizedBox(height: 5),
+                                SizedBox(
+                                  height: 15,
+                                  child: Center(
+                                    child: Text(
+                                      'Get',
+                                      style: TextStyle(
+                                        fontFamily: 'Aeroport',
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppTheme.textColor,
+                                        height: 1.0,
+                                      ),
+                                      textHeightBehavior:
+                                          const TextHeightBehavior(
+                                        applyHeightToFirstAscent: false,
+                                        applyHeightToLastDescent: false,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const HomePage(),
+                                  ),
+                                );
+                              },
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  SvgPicture.asset(
+                                    AppTheme.isLightTheme
+                                        ? 'assets/icons/menu/swap_light.svg'
+                                        : 'assets/icons/menu/swap_dark.svg',
+                                    width: 30,
+                                    height: 30,
+                                  ),
+                                  const SizedBox(height: 5),
+                                  SizedBox(
+                                    height: 15,
+                                    child: Center(
+                                      child: Text(
+                                        'Swap',
+                                        style: TextStyle(
+                                          fontFamily: 'Aeroport',
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppTheme.textColor,
+                                          height: 1.0,
+                                        ),
+                                        textHeightBehavior:
+                                            const TextHeightBehavior(
+                                          applyHeightToFirstAscent: false,
+                                          applyHeightToLastDescent: false,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                SvgPicture.asset(
+                                  AppTheme.isLightTheme
+                                      ? 'assets/icons/menu/trade_light.svg'
+                                      : 'assets/icons/menu/trade_dark.svg',
+                                  width: 30,
+                                  height: 30,
+                                ),
+                                const SizedBox(height: 5),
+                                SizedBox(
+                                  height: 15,
+                                  child: Center(
+                                    child: Text(
+                                      'Trade',
+                                      style: TextStyle(
+                                        fontFamily: 'Aeroport',
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppTheme.textColor,
+                                        height: 1.0,
+                                      ),
+                                      textHeightBehavior:
+                                          const TextHeightBehavior(
+                                        applyHeightToFirstAscent: false,
+                                        applyHeightToLastDescent: false,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                SvgPicture.asset(
+                                  AppTheme.isLightTheme
+                                      ? 'assets/icons/menu/send_light.svg'
+                                      : 'assets/icons/menu/send_dark.svg',
+                                  width: 30,
+                                  height: 30,
+                                ),
+                                const SizedBox(height: 5),
+                                SizedBox(
+                                  height: 15,
+                                  child: Center(
+                                    child: Text(
+                                      'Send',
+                                      style: TextStyle(
+                                        fontFamily: 'Aeroport',
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppTheme.textColor,
+                                        height: 1.0,
+                                      ),
+                                      textHeightBehavior:
+                                          const TextHeightBehavior(
+                                        applyHeightToFirstAscent: false,
+                                        applyHeightToLastDescent: false,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 30),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedTab = 'Coins';
+                              });
+                            },
+                            child: Text(
+                              'Coins',
+                              style: TextStyle(
+                                fontFamily: 'Aeroport',
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
+                                color: _selectedTab == 'Coins'
+                                    ? AppTheme.textColor
+                                    : const Color(0xFF818181),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 15),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedTab = 'Items';
+                              });
+                            },
+                            child: Text(
+                              'Items',
+                              style: TextStyle(
+                                fontFamily: 'Aeroport',
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
+                                color: _selectedTab == 'Items'
+                                    ? AppTheme.textColor
+                                    : const Color(0xFF818181),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 15),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedTab = 'History';
+                              });
+                            },
+                            child: Text(
+                              'History',
+                              style: TextStyle(
+                                fontFamily: 'Aeroport',
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
+                                color: _selectedTab == 'History'
+                                    ? AppTheme.textColor
+                                    : const Color(0xFF818181),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // Coins list - shown when Coins tab is selected
+                      if (_selectedTab == 'Coins')
+                        Column(
+                          children: _coins.map((coin) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 20),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 0),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    // Coin icon - 30px, centered vertically relative to 40px text columns
+                                    Image.asset(
+                                      coin['icon'] as String,
+                                      width: 30,
+                                      height: 30,
+                                      fit: BoxFit.contain,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    // Coin ticker and blockchain column
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          SizedBox(
+                                            height: 20,
+                                            child: Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: Text(
+                                                coin['ticker'] as String,
+                                                style: TextStyle(
+                                                  fontFamily: 'Aeroport',
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: AppTheme.textColor,
+                                                  height: 1.0,
+                                                ),
+                                                textHeightBehavior:
+                                                    const TextHeightBehavior(
+                                                  applyHeightToFirstAscent:
+                                                      false,
+                                                  applyHeightToLastDescent:
+                                                      false,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            height: 20,
+                                            child: Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: Text(
+                                                coin['blockchain'] as String,
+                                                style: const TextStyle(
+                                                  fontFamily: 'Aeroport',
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w400,
+                                                  color: Color(0xFF818181),
+                                                  height: 1.0,
+                                                ),
+                                                textHeightBehavior:
+                                                    const TextHeightBehavior(
+                                                  applyHeightToFirstAscent:
+                                                      false,
+                                                  applyHeightToLastDescent:
+                                                      false,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Amount and USD value column (right-aligned)
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        SizedBox(
+                                          height: 20,
+                                          child: Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Text(
+                                              coin['amount'] as String,
+                                              style: TextStyle(
+                                                fontFamily: 'Aeroport',
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w500,
+                                                color: AppTheme.textColor,
+                                                height: 1.0,
+                                              ),
+                                              textAlign: TextAlign.right,
+                                              textHeightBehavior:
+                                                  const TextHeightBehavior(
+                                                applyHeightToFirstAscent: false,
+                                                applyHeightToLastDescent: false,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          height: 20,
+                                          child: Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Text(
+                                              coin['usdValue'] as String,
+                                              style: const TextStyle(
+                                                fontFamily: 'Aeroport',
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w400,
+                                                color: Color(0xFF818181),
+                                                height: 1.0,
+                                              ),
+                                              textAlign: TextAlign.right,
+                                              textHeightBehavior:
+                                                  const TextHeightBehavior(
+                                                applyHeightToFirstAscent: false,
+                                                applyHeightToLastDescent: false,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.only(
+                      top: 10, bottom: 30, left: 15, right: 15),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: Container(
+                          constraints: const BoxConstraints(minHeight: 30),
+                          child: _controller.text.isEmpty
+                              ? SizedBox(
+                                  height: 30,
+                                  child: TextField(
+                                    key: _textFieldKey,
+                                    controller: _controller,
+                                    focusNode: _focusNode,
+                                    enabled: true,
+                                    readOnly: false,
+                                    cursorColor: AppTheme.textColor,
+                                    cursorHeight: 15,
+                                    maxLines: 11,
+                                    minLines: 1,
+                                    textAlignVertical: TextAlignVertical.center,
+                                    style: TextStyle(
+                                        fontFamily: 'Aeroport',
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                        height: 2.0,
+                                        color: AppTheme.textColor),
+                                    onSubmitted: (value) {
+                                      _navigateToNewPage();
+                                    },
+                                    onChanged: (value) {},
+                                    decoration: InputDecoration(
+                                      hintText: (_isFocused ||
+                                              _controller.text.isNotEmpty)
+                                          ? null
+                                          : 'Ask anything',
+                                      hintStyle: TextStyle(
+                                          color: AppTheme.textColor,
+                                          fontFamily: 'Aeroport',
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                          height: 2.0),
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: !_isFocused
+                                          ? const EdgeInsets.only(
+                                              left: 0,
+                                              right: 0,
+                                              top: 5,
+                                              bottom: 5)
+                                          : const EdgeInsets.only(right: 0),
+                                    ),
+                                  ),
+                                )
+                              : Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: TextField(
+                                    key: _textFieldKey,
+                                    controller: _controller,
+                                    focusNode: _focusNode,
+                                    enabled: true,
+                                    readOnly: false,
+                                    cursorColor: AppTheme.textColor,
+                                    cursorHeight: 15,
+                                    maxLines: 11,
+                                    minLines: 1,
+                                    textAlignVertical:
+                                        _controller.text.split('\n').length == 1
+                                            ? TextAlignVertical.center
+                                            : TextAlignVertical.bottom,
+                                    style: TextStyle(
+                                        fontFamily: 'Aeroport',
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                        height: 2,
+                                        color: AppTheme.textColor),
+                                    onSubmitted: (value) {
+                                      _navigateToNewPage();
+                                    },
+                                    onChanged: (value) {},
+                                    decoration: InputDecoration(
+                                      hintText: (_isFocused ||
+                                              _controller.text.isNotEmpty)
+                                          ? null
+                                          : 'Ask anything',
+                                      hintStyle: TextStyle(
+                                          color: AppTheme.textColor,
+                                          fontFamily: 'Aeroport',
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                          height: 2),
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding:
+                                          _controller.text.split('\n').length >
+                                                  1
+                                              ? const EdgeInsets.only(
+                                                  left: 0, right: 0, top: 11)
+                                              : const EdgeInsets.only(right: 0),
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 7.5),
+                        child: GestureDetector(
+                          onTap: () {
+                            _navigateToNewPage();
+                          },
+                          child: SvgPicture.asset(
+                            AppTheme.isLightTheme
+                                ? 'assets/icons/apply_light.svg'
+                                : 'assets/icons/apply_dark.svg',
+                            width: 15,
+                            height: 10,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -522,7 +1374,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   /// Calculate the maximum width needed for price column
-  /// Takes into account min, max, and selected point prices
+  /// Takes into account ALL prices in the chart data to prevent dynamic width changes
   double _calculateMaxPriceWidth() {
     const textStyle = TextStyle(
       color: Color(0xFF818181),
@@ -531,38 +1383,37 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
     double maxWidth = 0.0;
 
-    // Check min price
-    if (_chartMinPrice != null) {
-      final minPriceText = _formatPrice(_chartMinPrice!);
-      final textPainter = TextPainter(
-        text: TextSpan(text: minPriceText, style: textStyle),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-      maxWidth = math.max(maxWidth, textPainter.width);
-    }
-
-    // Check max price
-    if (_chartMaxPrice != null) {
-      final maxPriceText = _formatPrice(_chartMaxPrice!);
-      final textPainter = TextPainter(
-        text: TextSpan(text: maxPriceText, style: textStyle),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-      maxWidth = math.max(maxWidth, textPainter.width);
-    }
-
-    // Check selected point price
-    if (_selectedPointIndex != null &&
-        _originalChartData != null &&
-        _selectedPointIndex! < _originalChartData!.length) {
-      final selectedData = _originalChartData![_selectedPointIndex!];
-      final price = selectedData['price'] as double?;
-      if (price != null) {
-        final selectedPriceText = _formatPrice(price);
+    // Check all prices in the chart data to find the widest one
+    // This ensures the width doesn't change when pointing at different parts of the chart
+    if (_originalChartData != null && _originalChartData!.isNotEmpty) {
+      for (final dataPoint in _originalChartData!) {
+        final price = dataPoint['price'] as double?;
+        if (price != null) {
+          final priceText = _formatPrice(price);
+          final textPainter = TextPainter(
+            text: TextSpan(text: priceText, style: textStyle),
+            textDirection: TextDirection.ltr,
+          );
+          textPainter.layout();
+          maxWidth = math.max(maxWidth, textPainter.width);
+        }
+      }
+    } else {
+      // Fallback: check min and max prices if original data is not available
+      if (_chartMinPrice != null) {
+        final minPriceText = _formatPrice(_chartMinPrice!);
         final textPainter = TextPainter(
-          text: TextSpan(text: selectedPriceText, style: textStyle),
+          text: TextSpan(text: minPriceText, style: textStyle),
+          textDirection: TextDirection.ltr,
+        );
+        textPainter.layout();
+        maxWidth = math.max(maxWidth, textPainter.width);
+      }
+
+      if (_chartMaxPrice != null) {
+        final maxPriceText = _formatPrice(_chartMaxPrice!);
+        final textPainter = TextPainter(
+          text: TextSpan(text: maxPriceText, style: textStyle),
           textDirection: TextDirection.ltr,
         );
         textPainter.layout();
@@ -2814,7 +3665,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           child: SvgPicture.asset(
                             AppTheme.isLightTheme
                                 ? 'assets/icons/apply_light.svg'
-                                : 'assets/icons/apply_black.svg',
+                                : 'assets/icons/apply_dark.svg',
                             width: 15,
                             height: 10,
                           ),
